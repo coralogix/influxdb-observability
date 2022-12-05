@@ -337,6 +337,52 @@ func TestAddPoint_v1_untypedHistogram(t *testing.T) {
 	assertMetricsEqual(t, expect, b.GetMetrics())
 }
 
+func TestAddPoint_v1_statsdUntypedHistogram(t *testing.T) {
+	c, err := influx2otel.NewLineProtocolToOtelMetrics(new(common.NoopLogger))
+	require.NoError(t, err)
+
+	b := c.NewBatch()
+	err = b.AddPoint("test_service_stage_metrics_biz_success_v4",
+		map[string]string{
+			"container.name":       "42",
+			"otel.library.name":    "My Library",
+			"otel.library.version": "latest",
+			"method":               "post",
+			"code":                 "200",
+		},
+		map[string]interface{}{
+			"count":  int64(10),
+			"sum":    float64(50),
+			"median": int64(5),
+			"stddev": int64(0),
+			"upper":  int64(5),
+			"lower":  int64(5),
+		},
+		time.Unix(0, 1395066363000000123).UTC(),
+		common.InfluxMetricValueTypeUntyped)
+	require.NoError(t, err)
+
+	expect := pmetric.NewMetrics()
+	rm := expect.ResourceMetrics().AppendEmpty()
+	rm.Resource().Attributes().PutStr("container.name", "42")
+	ilMetrics := rm.ScopeMetrics().AppendEmpty()
+	ilMetrics.Scope().SetName("My Library")
+	ilMetrics.Scope().SetVersion("latest")
+	m := ilMetrics.Metrics().AppendEmpty()
+	m.SetName("test_service_stage_metrics_biz_success_v4")
+	m.SetEmptyHistogram()
+	m.Histogram().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	dp := m.Histogram().DataPoints().AppendEmpty()
+	dp.Attributes().PutStr("code", "200")
+	dp.Attributes().PutStr("method", "post")
+	dp.SetTimestamp(pcommon.NewTimestampFromTime(time.Unix(0, 1395066363000000123)))
+	dp.SetCount(10)
+	dp.SetSum(50)
+	dp.BucketCounts().FromRaw([]uint64{24054, 33444, 100392, 129389, 133988, 144320})
+
+	assertMetricsEqual(t, expect, b.GetMetrics())
+}
+
 func TestAddPoint_v1_summary(t *testing.T) {
 	c, err := influx2otel.NewLineProtocolToOtelMetrics(new(common.NoopLogger))
 	require.NoError(t, err)

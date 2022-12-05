@@ -215,12 +215,15 @@ func (b *MetricsBatch) convertHistogramV1(measurement string, tags map[string]st
 	for k, vi := range fields {
 		if k == common.MetricHistogramCountFieldKey {
 			foundCount = true
-			if vCount, ok := vi.(float64); !ok {
-				return fmt.Errorf("unsupported histogram count value type %T", vi)
-			} else {
-				count = uint64(vCount)
-			}
 
+			switch vCount := vi.(type) {
+			case float64:
+				count = uint64(vCount)
+			case int64:
+				count = uint64(vCount)
+			default:
+				return fmt.Errorf("unsupported histogram count value type %T", vi)
+			}
 		} else if k == common.MetricHistogramSumFieldKey {
 			foundSum = true
 			var ok bool
